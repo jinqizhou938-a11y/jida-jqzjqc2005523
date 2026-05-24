@@ -2,7 +2,9 @@ import type { Comment, CommunityPost, OutfitCard, WallItem } from '../types';
 import {
   buildDemoCommunityPosts,
   DEMO_COMMUNITY_DEFINITIONS,
+  getDemoCardById,
   isDemoPostId,
+  resolveDemoCardImage,
 } from '../data/communityDemoPosts';
 
 const STORAGE_KEY = 'jida_local_db';
@@ -159,8 +161,18 @@ function rememberCard(card: OutfitCard) {
 
 function hydrateCard(card: OutfitCard): OutfitCard {
   const cached = cardImageCache.get(card.id);
-  const merged = cached ? { ...card, ...cached } : card;
-  return cardFromStored(merged);
+  const merged = cached
+    ? {
+        ...cached,
+        ...card,
+        image_url: card.image_url || cached.image_url,
+        source_frame_url: card.source_frame_url || cached.source_frame_url,
+        thumbnail_urls: card.thumbnail_urls?.length ? card.thumbnail_urls : cached.thumbnail_urls,
+      }
+    : card;
+  const demo = getDemoCardById(card.id);
+  const withDemo = demo ? resolveDemoCardImage(merged) : merged;
+  return cardFromStored(withDemo);
 }
 
 function uid() {
@@ -300,15 +312,24 @@ export function ensureDemoCommunityPosts() {
   }
 
   for (const { post, card } of DEMO_COMMUNITY_DEFINITIONS) {
-    if (!db.cards[card.id]) {
-      db.cards[card.id] = compactCardForStorage(card, card.id);
+    const stored = compactCardForStorage(card, card.id);
+    const existing = db.cards[card.id];
+    if (!existing || existing.image_url !== stored.image_url) {
+      db.cards[card.id] = stored;
       changed = true;
     }
-    if (!db.posts.some((p) => p.id === post.id)) {
+    const postIdx = db.posts.findIndex((p) => p.id === post.id);
+    if (postIdx < 0) {
       db.posts.push({
         ...post,
-        outfit_cards: card,
+        outfit_cards: { ...card },
       } as CommunityPost & { username?: string });
+      changed = true;
+    } else if (!db.posts[postIdx].outfit_cards?.image_url) {
+      db.posts[postIdx] = {
+        ...db.posts[postIdx],
+        outfit_cards: { ...card },
+      };
       changed = true;
     }
   }
@@ -335,7 +356,10 @@ function dedupePostsByImage(posts: CommunityPost[]): CommunityPost[] {
 export function listFeed(): CommunityPost[] {
   ensureDemoCommunityPosts();
   const db = loadDb();
-  const demoPosts = buildDemoCommunityPosts();
+  const demoPosts = buildDemoCommunityPosts().map((p) => ({
+    ...p,
+    outfit_cards: resolveDemoCardImage(p.outfit_cards),
+  }));
 
   const userPosts = db.posts
     .filter((p) => !isDemoPostId(p.id))
@@ -382,7 +406,11 @@ export function toggleLike(userId: string, postId: string): { liked: boolean } {
   if (!post && isDemoPostId(postId)) {
     const demo = buildDemoCommunityPosts().find((p) => p.id === postId);
     if (demo) {
-      db.posts.push({ ...demo, username: demo.profiles?.username } as CommunityPost & { username?: string });
+      db.posts.push({
+        ...demo,
+        outfit_cards: resolveDemoCardImage(demo.outfit_cards),
+        username: demo.profiles?.username,
+      } as CommunityPost & { username?: string });
       post = db.posts[db.posts.length - 1];
     }
   }
@@ -406,7 +434,11 @@ export function toggleFavorite(userId: string, postId: string): { favorited: boo
   if (!isDemoPostId(postId) && !db.posts.some((p) => p.id === postId)) {
     const demo = buildDemoCommunityPosts().find((p) => p.id === postId);
     if (demo) {
-      db.posts.push({ ...demo, username: demo.profiles?.username } as CommunityPost & { username?: string });
+      db.posts.push({
+        ...demo,
+        outfit_cards: resolveDemoCardImage(demo.outfit_cards),
+        username: demo.profiles?.username,
+      } as CommunityPost & { username?: string });
     }
   }
   const idx = db.favorites.findIndex((f) => f.user_id === userId && f.post_id === postId);

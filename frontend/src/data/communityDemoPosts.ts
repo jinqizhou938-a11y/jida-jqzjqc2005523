@@ -87,10 +87,26 @@ export const DEMO_COMMUNITY_DEFINITIONS: Array<{
   },
 ];
 
+export function getDemoCardById(cardId: string): OutfitCard | undefined {
+  const def = DEMO_COMMUNITY_DEFINITIONS.find((d) => d.card.id === cardId);
+  return def ? { ...def.card } : undefined;
+}
+
+export function resolveDemoCardImage(card: OutfitCard): OutfitCard {
+  const demo = getDemoCardById(card.id);
+  if (!demo) return card;
+  return {
+    ...demo,
+    ...card,
+    image_url: card.image_url || demo.image_url,
+    source_frame_url: card.source_frame_url || demo.source_frame_url,
+  };
+}
+
 export function buildDemoCommunityPosts(): CommunityPost[] {
   return DEMO_COMMUNITY_DEFINITIONS.map(({ post, card }) => ({
     ...post,
-    outfit_cards: card,
+    outfit_cards: { ...card },
     profiles: { username: post.username },
   }));
 }

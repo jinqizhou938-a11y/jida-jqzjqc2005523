@@ -3,6 +3,7 @@ import type { ApiResponse, OutfitCard } from '../types';
 
 const publicApi = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1',
+  timeout: 600000,
 });
 
 export const cardsApi = {

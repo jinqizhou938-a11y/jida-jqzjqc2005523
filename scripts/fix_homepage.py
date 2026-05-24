@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+# -*- coding: utf-8 -*-
+from pathlib import Path
+
+CONTENT = """import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { ChevronRight } from '../../components/Icons/Icons';
 import PhotoUpload from '../../components/PhotoUpload/PhotoUpload';
@@ -290,3 +293,10 @@ export default function HomePage() {
     </div>
   );
 }
+"""
+
+CONTENT = CONTENT.replace("<motion.div", "<div").replace("</motion.div>", "</div>")
+
+path = Path(r"d:\Desktop\灵感衣橱\frontend\src\pages\Home\HomePage.tsx")
+path.write_text(CONTENT, encoding="utf-8")
+print("ok", path)

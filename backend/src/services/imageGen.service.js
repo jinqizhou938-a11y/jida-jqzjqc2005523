@@ -40,7 +40,7 @@ function extractImageUrl(data) {
   return data.output?.results?.[0]?.url || null;
 }
 
-async function waitForTask(taskId, { maxWaitMs = 180000, intervalMs = 2500 } = {}) {
+async function waitForTask(taskId, { maxWaitMs = 300000, intervalMs = 2500 } = {}) {
   const apiKey = getApiKey();
   const started = Date.now();
 

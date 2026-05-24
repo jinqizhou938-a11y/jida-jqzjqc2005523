@@ -43,4 +43,4 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 灵感衣橱 API 运行在 http://localhost:${PORT}`);
-});
+}).setTimeout(600000);

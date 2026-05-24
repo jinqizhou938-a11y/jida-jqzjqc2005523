@@ -1,5 +1,6 @@
-import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import type { OutfitCard as OutfitCardType, OutfitItem } from '../../types';
+import { getDemoCardById } from '../../data/communityDemoPosts';
 import { downloadCardShareImage } from '../../utils/cardShareImage';
 
 const SCENE_ICONS: Record<string, string> = {
@@ -13,8 +14,10 @@ const SCENE_ICONS: Record<string, string> = {
 
 function enrichCard(card: OutfitCardType): OutfitCardType {
   const raw = card.ai_raw as Record<string, unknown> | undefined;
+  const demoUrl = getDemoCardById(card.id)?.image_url;
   return {
     ...card,
+    ...(demoUrl && !card.image_url ? { image_url: demoUrl } : {}),
     style_tags: card.style_tags || (raw?.style_tags as string[]) || [],
     accessories: card.accessories || (raw?.accessories as string[]) || [],
     season: card.season || (raw?.season as string) || '',
@@ -51,14 +54,30 @@ interface OutfitCardProps {
   onExportError?: (message: string) => void;
 }
 
+function resolveImageCandidates(card: OutfitCardType, view: 'tryon' | 'video'): string[] {
+  const demoUrl = getDemoCardById(card.id)?.image_url;
+  const tryOnUrl = card.image_url || demoUrl;
+  const sourceFrameUrl = card.source_frame_url || card.thumbnail_urls?.[0];
+  const primary = view === 'tryon' ? tryOnUrl : sourceFrameUrl;
+  const secondary = view === 'tryon' ? sourceFrameUrl : tryOnUrl;
+  return [primary, secondary, demoUrl].filter((url, i, arr): url is string => Boolean(url) && arr.indexOf(url) === i);
+}
+
 function CardImage({ card, compact }: { card: OutfitCardType; compact?: boolean }) {
-  const tryOnUrl = card.image_url;
+  const tryOnUrl = card.image_url || getDemoCardById(card.id)?.image_url;
   const sourceFrameUrl = card.source_frame_url || card.thumbnail_urls?.[0];
 
   const [view, setView] = useState<'tryon' | 'video'>('tryon');
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [failed, setFailed] = useState(false);
-  const src = view === 'tryon' ? tryOnUrl : sourceFrameUrl;
+  const candidates = resolveImageCandidates(card, view);
+  const src = candidates[candidateIndex];
   const canToggle = Boolean(tryOnUrl && sourceFrameUrl);
+
+  useEffect(() => {
+    setCandidateIndex(0);
+    setFailed(false);
+  }, [card.id, view, tryOnUrl, sourceFrameUrl]);
 
   return (
     <div
@@ -74,7 +93,13 @@ function CardImage({ card, compact }: { card: OutfitCardType; compact?: boolean 
             compact ? 'max-h-[260px]' : 'max-h-[520px]'
           }`}
           loading="lazy"
-          onError={() => setFailed(true)}
+          onError={() => {
+            if (candidateIndex + 1 < candidates.length) {
+              setCandidateIndex((i) => i + 1);
+              return;
+            }
+            setFailed(true);
+          }}
         />
       ) : (
         <div className="w-full h-60 flex flex-col items-center justify-center text-gray-400 gap-2">
@@ -90,7 +115,6 @@ function CardImage({ card, compact }: { card: OutfitCardType; compact?: boolean 
             onClick={(e) => {
               e.stopPropagation();
               setView('tryon');
-              setFailed(false);
             }}
             className={`px-2.5 py-1 rounded-full text-xs font-medium shadow-sm ${
               view === 'tryon' ? 'bg-brand text-white' : 'bg-white/90 text-gray-600'
@@ -103,7 +127,6 @@ function CardImage({ card, compact }: { card: OutfitCardType; compact?: boolean 
             onClick={(e) => {
               e.stopPropagation();
               setView('video');
-              setFailed(false);
             }}
             className={`px-2.5 py-1 rounded-full text-xs font-medium shadow-sm ${
               view === 'video' ? 'bg-brand text-white' : 'bg-white/90 text-gray-600'
